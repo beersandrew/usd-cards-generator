@@ -1,0 +1,28 @@
+#usda 1.0
+(
+    defaultPrim = "cube"
+)
+
+def Cube "cube" (
+    prepend apiSchemas = ["AssetPreviewsAPI"]
+    assetInfo = {
+        dictionary previews = {
+            dictionary thumbnails = {
+                dictionary default = {
+                    asset defaultImage = @renders/cube_rainbow.0.png@
+                }
+            }
+        }
+    }
+)
+{
+    float3[] extent = [(-1, -1, -1), (1, 1, 1)]
+    uniform bool model:applyDrawMode = 1
+    uniform token model:cardGeometry = "box"
+    uniform token model:drawMode = "cards"
+    uniform float3 model:drawModeColor = (1, 0, 0)
+    color3f[] primvars:displayColor = [(0, 0, 1), (1, 0, 1), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (1, 0, 0), (0, 1, 0)] (
+        interpolation = "vertex"
+    )
+}
+
