@@ -7,6 +7,19 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from collections import namedtuple
+
+Card = namedtuple('Card', ['name', 'horizontalIndex', 'verticalIndex', 'sign', 'rotations', 'translationIndex'])
+Rotation = namedtuple('Rotation', ['index', 'amount'])
+
+cards = [
+    Card('XPos', 2, 1, 1, [Rotation(0, 90), Rotation(1, 90)], 0),
+    Card('XNeg', 2, 1, -1, [Rotation(0, 90), Rotation(1, 270)], 0),
+    Card('YPos', 2, 0, 1, [Rotation(1, 180), Rotation(0, 270)], 1),
+    Card('YNeg', 2, 0, -1, [Rotation(0, 90)], 1),
+    Card('ZPos', 0, 1, 1, [], 2),
+    Card('ZNeg', 0, 1, -1, [Rotation(2, 180), Rotation(1, 180)], 2)
+]
 
 def parse_args():
     parser = argparse.ArgumentParser(description="This script generates cards for a given USD file and associates them with the file.")
@@ -28,7 +41,7 @@ def apply_cards_defaults(usd_file, verbose):
     subject_stage = Usd.Stage.Open(usd_file)
     subject_root_prim = subject_stage.GetDefaultPrim()
     geom_model_api = UsdGeom.ModelAPI(subject_root_prim)
-    geom_model_api.CreateModelApplyDrawModeAttr(True)
+    geom_model_api.CreateModelApplyDrawModeAttr(False)
     geom_model_api.CreateModelCardGeometryAttr("box")
     geom_model_api.CreateModelDrawModeAttr("cards")
     geom_model_api.CreateModelDrawModeColorAttr((1, 0, 0))
@@ -36,64 +49,62 @@ def apply_cards_defaults(usd_file, verbose):
     subject_stage.GetRootLayer().Save()
 
 def generate_cards(usd_file, verbose):
-    if verbose: 
-        print("Step 1: Setting up the camera...")
-    
     subject_stage = Usd.Stage.Open(usd_file)
-    setup_camera(subject_stage, usd_file)
+
+    if verbose: 
+        print("Step 2: Setting up the cameras...")
+    setup_cameras(subject_stage, usd_file)
     
     if verbose:
-        print("Step 2: Taking the snapshot...")
-    
-    Path("renders").mkdir(parents=True, exist_ok=True)
+        print("Step 3: Taking the snapshots...")
+    image_names = take_snapshots()
 
-    image_path = os.path.join("renders", create_image_filename(usd_file)).replace("\\", "/")
-    image_name = take_snapshot(image_path)
+    return image_names
 
-    return image_name
-
-def setup_camera(subject_stage, usd_file):
-    camera_stage = create_camera()
-    move_camera(camera_stage, subject_stage)
+def setup_cameras(subject_stage, usd_file):
+    camera_stage = create_camera_stage()
+    create_camera_prims(camera_stage)
+    move_cameras(camera_stage, subject_stage)
     sublayer_subject(camera_stage, usd_file)
 
-def create_camera():
-    stage = Usd.Stage.CreateNew('camera.usda')
-
-    # Set metadata on the stage.
-    stage.SetDefaultPrim(stage.DefinePrim('/MainCamera', 'Xform'))
+def create_camera_stage():
+    stage = Usd.Stage.CreateNew('cameras.usda')
     stage.SetMetadata('metersPerUnit', 0.01)
 
-    # Define the "ThumbnailGenerator" Xform.
-    UsdGeom.Xform.Define(stage, '/ThumbnailGenerator')
-
-    # Define the "MainCamera" under the "ThumbnailGenerator".
-    camera = UsdGeom.Camera.Define(stage, '/ThumbnailGenerator/MainCamera')
-
-    # Set the camera attributes.
-    camera.CreateFocalLengthAttr(50)
-    camera.CreateFocusDistanceAttr(168.60936)
-    camera.CreateFStopAttr(0)
-    camera.CreateHorizontalApertureAttr(24)
-    camera.CreateHorizontalApertureOffsetAttr(0)
-    camera.CreateProjectionAttr("perspective")
-    camera.CreateVerticalApertureAttr(24)
-    camera.CreateVerticalApertureOffsetAttr(0)
     return stage
 
-def move_camera(camera_stage, subject_stage):
-    camera_prim = UsdGeom.Camera.Get(camera_stage, '/ThumbnailGenerator/MainCamera')
-    camera_translation = create_camera_translation(subject_stage, camera_prim)
-    apply_camera_translation(camera_stage, camera_prim, camera_translation)
+def create_camera_prims(camera_stage):
+    for card in cards:
+        camera = UsdGeom.Camera.Define(camera_stage, '/CardGenerator/' + card.name)
+        camera.CreateFocalLengthAttr(50)
+        camera.CreateFocusDistanceAttr(168.60936)
+        camera.CreateFStopAttr(0)
+        camera.CreateHorizontalApertureAttr(24)
+        camera.CreateHorizontalApertureOffsetAttr(0)
+        camera.CreateProjectionAttr("perspective")
+        camera.CreateVerticalApertureAttr(24)
+        camera.CreateVerticalApertureOffsetAttr(0)
 
-def create_camera_translation(subject_stage, camera_prim):
+
+def move_cameras(camera_stage, subject_stage):
+    for card in cards:
+        camera_prim = UsdGeom.Camera.Get(camera_stage, '/CardGenerator/' + card.name)
+        camera_translation = create_camera_translation(subject_stage, camera_prim, card)
+
+        apply_camera_translation(camera_stage, camera_prim, camera_translation)
+
+        for rotation in card.rotations:
+            apply_camera_rotation(camera_stage, camera_prim, rotation.index, rotation.amount)
+        
+def create_camera_translation(subject_stage, camera_prim, card):
     bounding_box = get_bounding_box(subject_stage)
     min_bound = bounding_box.GetMin()
     max_bound = bounding_box.GetMax()
 
     subject_center = (min_bound + max_bound) / 2.0
-    distance = get_distance_to_camera(min_bound, max_bound, camera_prim)
-    return subject_center + get_camera_z_translation(distance)
+    distance = get_distance_to_camera(min_bound, max_bound, camera_prim, card.horizontalIndex, card.verticalIndex)
+    distance *= card.sign
+    return subject_center + get_camera_translation(distance, card.translationIndex)
 
 def get_bounding_box(subject_stage):
     bboxCache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
@@ -101,13 +112,13 @@ def get_bounding_box(subject_stage):
     root = subject_stage.GetPseudoRoot()
     return bboxCache.ComputeWorldBound(root).GetBox()
 
-def get_distance_to_camera(min_bound, max_bound, camera_prim):
+def get_distance_to_camera(min_bound, max_bound, camera_prim, horizontalIndex, verticalIndex):
     focal_length = camera_prim.GetFocalLengthAttr().Get()
     horizontal_aperture = camera_prim.GetHorizontalApertureAttr().Get()
     vertical_aperture = camera_prim.GetVerticalApertureAttr().Get()
 
-    distance_to_capture_horizontal = calculate_field_of_view_distance(horizontal_aperture, (max_bound[0] - min_bound[0]) * 10, focal_length)
-    distance_to_capture_vertical = calculate_field_of_view_distance(vertical_aperture, (max_bound[1] - min_bound[1]) * 10, focal_length)
+    distance_to_capture_horizontal = calculate_field_of_view_distance(horizontal_aperture, (max_bound[horizontalIndex] - min_bound[horizontalIndex]) * 10, focal_length)
+    distance_to_capture_vertical = calculate_field_of_view_distance(vertical_aperture, (max_bound[verticalIndex] - min_bound[verticalIndex]) * 10, focal_length)
 
     return max(distance_to_capture_horizontal, distance_to_capture_vertical)
 
@@ -124,36 +135,47 @@ def calculate_camera_distance(subject_size, field_of_view):
     distance = (subject_size / 2) / math.tan(field_of_view / 2)
     return distance
 
-def get_camera_z_translation(distance):
-    return Gf.Vec3d(0, 0, distance / 10.0)  # convert units from mm to cm
+def get_camera_translation(distance, translationIndex):
+    vector = Gf.Vec3d(0, 0, 0)
+    vector[translationIndex] = distance / 10.0 # convert units from mm to cm
+    return vector
 
 def apply_camera_translation(camera_stage, camera_prim, camera_translation):
     xformRoot = UsdGeom.Xformable(camera_prim.GetPrim())
-    translateOp = None
-    # Go through each operation in the xformable schema
-    for op in xformRoot.GetOrderedXformOps():
-        # If the operation is a translate operation, we've found our operation
-        if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
-            translateOp = op
-            break
-
-    # If no translate operation exists, create one
-    if translateOp is None:
-        translateOp = xformRoot.AddTranslateOp(UsdGeom.XformOp.PrecisionDouble)
-
+    translateOp = xformRoot.AddTranslateOp(UsdGeom.XformOp.PrecisionDouble)
     translateOp.Set(camera_translation)
+    camera_stage.Save()
+
+def apply_camera_rotation(camera_stage, camera_prim, rotationDirection, rotationAmount):
+    xformRoot = UsdGeom.Xformable(camera_prim.GetPrim())
+    if rotationDirection == 0:
+        rotateOp = xformRoot.AddRotateXOp()
+        rotateOp.Set(rotationAmount)
+    elif rotationDirection == 1:
+        rotateOp = xformRoot.AddRotateYOp()
+        rotateOp.Set(rotationAmount)
+    else:
+        rotateOp = xformRoot.AddRotateZOp()
+        rotateOp.Set(rotationAmount)
+
     camera_stage.Save()
 
 def sublayer_subject(camera_stage, input_file):
     camera_stage.GetRootLayer().subLayerPaths = [input_file]
     camera_stage.GetRootLayer().Save()
 
-def take_snapshot(image_name):
+def take_snapshots():
+    Path("renders").mkdir(parents=True, exist_ok=True)
+    images = []
     renderer = get_renderer()
-    cmd = ['usdrecord', '--frames', '0:0', '--camera', 'ZCamera', '--imageWidth', '2048', '--renderer', renderer, 'camera.usda', image_name]
-    run_os_specific_usdrecord(cmd)
-    os.remove("camera.usda")
-    return image_name.replace(".#.", ".0.")
+    for card in cards:
+        image_name = os.path.join("renders", card.name + ".#.png").replace("\\", "/")
+        cmd = ['usdrecord', '--frames', '0:0', '--camera', card.name, '--imageWidth', '2048', '--renderer', renderer, 'cameras.usda', image_name]
+        run_os_specific_usdrecord(cmd)
+        images.append(image_name.replace(".#.", ".0."))
+    
+    os.remove("cameras.usda")
+    return images
 
 def get_renderer():
     if os.name == 'nt':
@@ -179,17 +201,25 @@ def run_os_specific_usdrecord(cmd):
 def create_image_filename(input_path):
     return input_path.split('.')[0] + ".#.png"
 
-def link_image_to_subject(subject_stage, image_name):
+def link_images_to_subject(subject_stage, images):
     subject_root_prim = subject_stage.GetDefaultPrim()
-    mediaAPI = UsdMedia.AssetPreviewsAPI.Apply(subject_root_prim)
-    thumbnails = UsdMedia.AssetPreviewsAPI.Thumbnails(defaultImage = Sdf.AssetPath(image_name))
-    mediaAPI.SetDefaultThumbnails(thumbnails)
+    subject_root_prim.SetMetadata("kind", "component")
+    geom_model_api = UsdGeom.ModelAPI(subject_root_prim)
+
+    geom_model_api.CreateModelCardTextureXPosAttr(images[0])
+    geom_model_api.CreateModelCardTextureXNegAttr(images[1])
+    geom_model_api.CreateModelCardTextureYPosAttr(images[2])
+    geom_model_api.CreateModelCardTextureYNegAttr(images[3])
+    geom_model_api.CreateModelCardTextureZPosAttr(images[4])
+    geom_model_api.CreateModelCardTextureZNegAttr(images[5])
+    geom_model_api.CreateModelApplyDrawModeAttr(True)
+
     subject_stage.GetRootLayer().Save()
     
 def create_usdz_wrapper_stage(usdz_file):
     file_name = usdz_file.split('.')[0]
     existing_stage = Usd.Stage.Open(usd_file)
-    new_stage = Usd.Stage.CreateNew(file_name + '_Thumbnail.usda')
+    new_stage = Usd.Stage.CreateNew(file_name + '_Cards.usda')
     
     UsdUtils.CopyLayerMetadata(existing_stage.GetRootLayer(), new_stage.GetRootLayer())
 
@@ -197,13 +227,13 @@ def create_usdz_wrapper_stage(usdz_file):
     new_stage.GetRootLayer().Save()
     return new_stage
 
-def zip_results(usd_file, image_name, is_usdz):
-    file_list = [usd_file, image_name]
+def zip_results(usd_file, images, is_usdz):
+    file_list = [usd_file] + images
 
     if is_usdz:
-        file_list.append(usd_file.split('.')[0] + '_Thumbnail.usda')
+        file_list.append(usd_file.split('.')[0] + '_Cards.usda')
         
-    usdz_file = usd_file.split('.')[0] + '_Thumbnail.usdz'
+    usdz_file = usd_file.split('.')[0] + '_Cards.usdz'
     cmd = ["usdzip", "-r", usdz_file] + file_list
     subprocess.run(cmd)
 
@@ -216,16 +246,16 @@ if __name__ == "__main__":
 
     apply_cards_defaults(usd_file, args.verbose)
         
-    # image_name = generate_cards(usd_file, args.verbose)
-    # subject_stage = create_usdz_wrapper_stage(usd_file) if is_usdz else Usd.Stage.Open(usd_file)
+    images = generate_cards(usd_file, args.verbose)
+    subject_stage = create_usdz_wrapper_stage(usd_file) if is_usdz else Usd.Stage.Open(usd_file)
 
-    # if args.verbose:
-    #     print("Step 3: Linking thumbnail to subject...")
+    if args.verbose:
+        print("Step 4: Linking cards to subject...")
 
-    # link_image_to_subject(subject_stage, image_name)
+    link_images_to_subject(subject_stage, images)
 
-    # if args.create_usdz_result:
-    #     if args.verbose:
-    #         print("Step 4: Linking thumbnail to subject...")
+    if args.create_usdz_result:
+        if args.verbose:
+            print("Step 5: Zipping cards as usdz...")
         
-    #     zip_results(usd_file, image_name, is_usdz)
+        zip_results(usd_file, images, is_usdz)
