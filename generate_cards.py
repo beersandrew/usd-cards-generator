@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from pxr import Usd, UsdGeom, UsdMedia, Sdf, Gf, UsdUtils
+from pxr import Usd, UsdGeom, Gf, UsdUtils
 import subprocess
 import math
 import os
@@ -14,11 +14,11 @@ Rotation = namedtuple('Rotation', ['index', 'amount'])
 
 cards = [
     Card('XPos', 2, 1, 1, [Rotation(0, 90), Rotation(1, 90)], 0),
-    Card('XNeg', 2, 1, -1, [Rotation(0, 90), Rotation(1, 270)], 0),
+    Card('XNeg', 2, 1, -1, [Rotation(0, 270), Rotation(1, 270)], 0),
     Card('YPos', 2, 0, 1, [Rotation(1, 180), Rotation(0, 270)], 1),
-    Card('YNeg', 2, 0, -1, [Rotation(0, 90)], 1),
+    Card('YNeg', 2, 0, -1, [Rotation(1, 180), Rotation(0, 90)], 1),
     Card('ZPos', 0, 1, 1, [], 2),
-    Card('ZNeg', 0, 1, -1, [Rotation(2, 180), Rotation(1, 180)], 2)
+    Card('ZNeg', 0, 1, -1, [Rotation(1, 180)], 2)
 ]
 
 def parse_args():
@@ -34,11 +34,10 @@ def parse_args():
                         help='Prints out the steps as they happen')
     return parser.parse_args()
 
-def apply_cards_defaults(usd_file, verbose):
+def apply_cards_defaults(subject_stage, verbose):
     if verbose: 
         print("Step 1: Applying cards default values...")
     
-    subject_stage = Usd.Stage.Open(usd_file)
     subject_root_prim = subject_stage.GetDefaultPrim()
     geom_model_api = UsdGeom.ModelAPI(subject_root_prim)
     geom_model_api.CreateModelApplyDrawModeAttr(False)
@@ -48,11 +47,10 @@ def apply_cards_defaults(usd_file, verbose):
 
     subject_stage.GetRootLayer().Save()
 
-def generate_cards(usd_file, verbose):
-    subject_stage = Usd.Stage.Open(usd_file)
-
+def generate_cards(usd_file, subject_stage, verbose):
     if verbose: 
         print("Step 2: Setting up the cameras...")
+
     setup_cameras(subject_stage, usd_file)
     
     if verbose:
@@ -79,10 +77,8 @@ def create_camera_prims(camera_stage):
         camera.CreateFocalLengthAttr(50)
         camera.CreateFocusDistanceAttr(168.60936)
         camera.CreateFStopAttr(0)
-        camera.CreateHorizontalApertureAttr(24)
         camera.CreateHorizontalApertureOffsetAttr(0)
         camera.CreateProjectionAttr("perspective")
-        camera.CreateVerticalApertureAttr(24)
         camera.CreateVerticalApertureOffsetAttr(0)
 
 
@@ -102,8 +98,31 @@ def create_camera_translation(subject_stage, camera_prim, card):
     max_bound = bounding_box.GetMax()
 
     subject_center = (min_bound + max_bound) / 2.0
-    distance = get_distance_to_camera(min_bound, max_bound, camera_prim, card.horizontalIndex, card.verticalIndex)
+
+    bounding_box_width = (max_bound[card.horizontalIndex] - min_bound[card.horizontalIndex]) * 10
+    bounding_box_height = (max_bound[card.verticalIndex] - min_bound[card.verticalIndex]) * 10
+    focal_length = camera_prim.GetFocalLengthAttr().Get()
+
+    distance = get_distance_to_camera(bounding_box_width, bounding_box_height, focal_length)
     distance *= card.sign
+
+    flip_aperatures = False
+    for rotation in card.rotations:
+        if rotation.amount != 180:
+            flip_aperatures = True
+            break
+    
+    actual_horizontal_aperture = focal_length * bounding_box_width / distance
+    actual_vertical_aperture = focal_length * bounding_box_height / distance
+
+    if flip_aperatures:
+        camera_prim.CreateHorizontalApertureAttr(actual_vertical_aperture)
+        camera_prim.CreateVerticalApertureAttr(actual_horizontal_aperture)
+    else:
+        camera_prim.CreateHorizontalApertureAttr(actual_horizontal_aperture)
+        camera_prim.CreateVerticalApertureAttr(actual_vertical_aperture)
+
+
     return subject_center + get_camera_translation(distance, card.translationIndex)
 
 def get_bounding_box(subject_stage):
@@ -112,15 +131,13 @@ def get_bounding_box(subject_stage):
     root = subject_stage.GetPseudoRoot()
     return bboxCache.ComputeWorldBound(root).GetBox()
 
-def get_distance_to_camera(min_bound, max_bound, camera_prim, horizontalIndex, verticalIndex):
-    focal_length = camera_prim.GetFocalLengthAttr().Get()
-    horizontal_aperture = camera_prim.GetHorizontalApertureAttr().Get()
-    vertical_aperture = camera_prim.GetVerticalApertureAttr().Get()
+def get_distance_to_camera(bounding_box_width, bounding_box_height, focal_length):
+    distance_to_capture_horizontal = calculate_field_of_view_distance(24, bounding_box_width, focal_length)
+    distance_to_capture_vertical = calculate_field_of_view_distance(24, bounding_box_height, focal_length)
 
-    distance_to_capture_horizontal = calculate_field_of_view_distance(horizontal_aperture, (max_bound[horizontalIndex] - min_bound[horizontalIndex]) * 10, focal_length)
-    distance_to_capture_vertical = calculate_field_of_view_distance(vertical_aperture, (max_bound[verticalIndex] - min_bound[verticalIndex]) * 10, focal_length)
+    max_distance = max(distance_to_capture_horizontal, distance_to_capture_vertical)
 
-    return max(distance_to_capture_horizontal, distance_to_capture_vertical)
+    return max_distance
 
 def calculate_field_of_view_distance(sensor_size, object_size, focal_length):
     return calculate_camera_distance(object_size, calculate_field_of_view(focal_length, sensor_size))
@@ -216,10 +233,9 @@ def link_images_to_subject(subject_stage, images):
 
     subject_stage.GetRootLayer().Save()
     
-def create_usdz_wrapper_stage(usdz_file):
-    file_name = usdz_file.split('.')[0]
-    existing_stage = Usd.Stage.Open(usd_file)
-    new_stage = Usd.Stage.CreateNew(file_name + '_Cards.usda')
+def create_usdz_wrapper_stage(usdz_file, usdz_wrapper_name):
+    existing_stage = Usd.Stage.Open(usdz_file)
+    new_stage = Usd.Stage.CreateNew(usdz_wrapper_name)
     
     UsdUtils.CopyLayerMetadata(existing_stage.GetRootLayer(), new_stage.GetRootLayer())
 
@@ -227,11 +243,11 @@ def create_usdz_wrapper_stage(usdz_file):
     new_stage.GetRootLayer().Save()
     return new_stage
 
-def zip_results(usd_file, images, is_usdz):
+def zip_results(usd_file, images, is_usdz, usdz_wrapper_name):
     file_list = [usd_file] + images
 
     if is_usdz:
-        file_list.append(usd_file.split('.')[0] + '_Cards.usda')
+        file_list.append(usdz_wrapper_name)
         
     usdz_file = usd_file.split('.')[0] + '_Cards.usdz'
     cmd = ["usdzip", "-r", usdz_file] + file_list
@@ -243,11 +259,15 @@ if __name__ == "__main__":
 
     usd_file = args.usd_file
     is_usdz = ".usdz" in usd_file
+    usdz_wrapper_name = usd_file.split('.')[0] + '_Cards.usda'
 
-    apply_cards_defaults(usd_file, args.verbose)
+    subject_stage = create_usdz_wrapper_stage(usd_file, usdz_wrapper_name) if is_usdz else Usd.Stage.Open(usd_file)
+
+    apply_cards_defaults(subject_stage, args.verbose)
+
+    file_to_sublayer = usdz_wrapper_name if is_usdz else usd_file
         
-    images = generate_cards(usd_file, args.verbose)
-    subject_stage = create_usdz_wrapper_stage(usd_file) if is_usdz else Usd.Stage.Open(usd_file)
+    images = generate_cards(file_to_sublayer, subject_stage, args.verbose)
 
     if args.verbose:
         print("Step 4: Linking cards to subject...")
