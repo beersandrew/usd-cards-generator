@@ -1,0 +1,37 @@
+# USD Cards Generator
+
+## Purpose
+Given a USD file, take pictures of each of it's axes and assign them as it's card images
+
+## Usage
+
+`python generate_cards.py <usd_file>`
+
+positional arguments:
+  - `usd_file` : The USD file you want to add a cards to. If USDZ is input, a new USD file will be created to wrap the existing one called `<subject_usd_file>_Cards.usd`
+
+optional arguments:
+  - `-h`, `--help` : Show help
+  - `--create-usdz-result` :  Returns the resulting files as a new USDZ file called `<subject_usd_file>_Cards.usdz`
+  - `--verbose` :             Prints out the steps as they happen
+
+  Note: You must have usd installed and available in your path. [Install Steps Here](https://github.com/PixarAnimationStudios/OpenUSD#getting-and-building-the-code)
+
+## How it works
+Given a USD file to use as the subject of the cards do the following
+
+1. Apply DrawMode defaults (cards attribute, box geometry)
+2. Create, position, and orient cameras for each axis (XPos, XNeg, YPos, YNeg, ZPos, ZNeg)
+3. Sublayer the subject in the camera
+4. Run `usdrecord` to take a snapshot and store it in `/renders/<axis>.0.png`
+    - macOS
+        - `usdrecord --frames 0:0 --camera ZCamera --imageWidth 2048 --renderer Metal camera.usda <axis>.#.png` 
+    - windows
+        - `usdrecord --frames 0:0 --camera ZCamera --imageWidth 2048 --renderer GL camera.usda <axis>.#.png` 
+        - note: this will run with `shell=True` for the subprocess call
+    - linux
+        - `usdrecord --frames 0:0 --camera ZCamera --imageWidth 2048 --renderer Metal camera.usda <axis>.#.png`
+    - ZCamera & camera.usda are generated in step 2
+4. If the file is not a USDZ file, assign each image as the usd's axis card image
+5. If the file is a USDZ file, create a new `<subject_usd_file>_Cards.usda`, assign each image as the usd's axis card image, and sublayer `<subject_usd_file>.usdz`
+6. If `--create-usdz-result` is passed in, combine all of the files into a USDZ, in the case of a USD file it would be the input file and each axis image. In the case of a USDZ file it would be the new USDA, the axis images, and the input USDZ
