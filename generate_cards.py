@@ -8,6 +8,8 @@ import sys
 import argparse
 from pathlib import Path
 from collections import namedtuple
+from concurrent.futures import ThreadPoolExecutor
+
 
 Card = namedtuple('Card', ['name', 'horizontalIndex', 'verticalIndex', 'sign', 'rotations', 'translationIndex'])
 Rotation = namedtuple('Rotation', ['index', 'amount'])
@@ -185,11 +187,15 @@ def take_snapshots():
     Path("renders").mkdir(parents=True, exist_ok=True)
     images = []
     renderer = get_renderer()
-    for card in cards:
+
+    def task(card):
         image_name = os.path.join("renders", card.name + ".#.png").replace("\\", "/")
         cmd = ['usdrecord', '--frames', '0:0', '--camera', card.name, '--imageWidth', '2048', '--renderer', renderer, 'cameras.usda', image_name]
         run_os_specific_usdrecord(cmd)
-        images.append(image_name.replace(".#.", ".0."))
+        return image_name.replace(".#.", ".0.")
+    
+    with ThreadPoolExecutor() as executor:
+        images = list(executor.map(task, cards))
     
     os.remove("cameras.usda")
     return images
