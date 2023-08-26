@@ -1,0 +1,9 @@
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Other common files to ignore
+*.log
+*.swp
+.DS_Store
