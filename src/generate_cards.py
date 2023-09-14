@@ -39,6 +39,8 @@ def apply_cards_defaults(subject_stage, verbose):
         print("Step 1: Applying cards default values...")
     
     subject_root_prim = subject_stage.GetDefaultPrim()
+    subject_root_prim.SetMetadata("kind", "component")
+    UsdGeom.ModelAPI.Apply(subject_root_prim)
     geom_model_api = UsdGeom.ModelAPI(subject_root_prim)
     geom_model_api.CreateModelApplyDrawModeAttr(False)
     geom_model_api.CreateModelCardGeometryAttr("box")
@@ -47,9 +49,8 @@ def apply_cards_defaults(subject_stage, verbose):
 
 def link_images_to_subject(subject_stage, images):
     subject_root_prim = subject_stage.GetDefaultPrim()
-    subject_root_prim.SetMetadata("kind", "component")
+    
     geom_model_api = UsdGeom.ModelAPI(subject_root_prim)
-
     geom_model_api.CreateModelCardTextureXPosAttr(images[0])
     geom_model_api.CreateModelCardTextureXNegAttr(images[1])
     geom_model_api.CreateModelCardTextureYPosAttr(images[2])
