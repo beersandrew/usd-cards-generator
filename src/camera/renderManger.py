@@ -6,16 +6,16 @@ import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-def take_snapshots(cards):
+def take_snapshots(cards, output_extension):
     Path("renders").mkdir(parents=True, exist_ok=True)
     images = []
     renderer = get_renderer()
 
     def task(card):
-        image_name = os.path.join("renders", card.name + ".#.png").replace("\\", "/")
-        cmd = ['usdrecord', '--frames', '0:0', '--camera', card.name, '--imageWidth', '2048', '--renderer', renderer, 'cameras.usda', image_name]
+        image_name = os.path.join("renders", card.name + "." + output_extension).replace("\\", "/")
+        cmd = ['usdrecord','--camera', card.name, '--imageWidth', '2048', '--renderer', renderer, 'cameras.usda', image_name]
         run_os_specific_usdrecord(cmd)
-        return image_name.replace(".#.", ".0.")
+        return image_name
     
     with ThreadPoolExecutor() as executor:
         images = list(executor.map(task, cards))
@@ -43,6 +43,3 @@ def run_os_specific_usdrecord(cmd):
             subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         else:
             subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
-def create_image_filename(input_path):
-    return input_path.split('.')[0] + ".#.png"
