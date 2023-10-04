@@ -28,7 +28,7 @@ def parse_args():
 
     is_usdz = ".usdz" in args.usd_file
     usdz_wrapper_name = args.usd_file.split('.')[0] + '_Cards.usda'
-    file_to_sublayer = args.usdz_wrapper_name if is_usdz else args.usd_file
+    file_to_sublayer = usdz_wrapper_name if is_usdz else args.usd_file
 
     return Args(args.usd_file, 
                 args.create_usdz_result, 

@@ -4,12 +4,12 @@ from pxr import UsdGeom, Gf
 from camera.utils.distanceCalculator import get_distance_to_frame_subject
 from camera.globals import APERTURE, FOCAL_LENGTH, FOCUS_DISTANCE
 
-def create_camera_for_card(card, camera_stage, subject_center, bounding_box):
+def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box):
     camera_prim = create_camera_with_defaults(camera_stage, card.name)
 
     distance = get_distance_to_frame_subject(bounding_box, APERTURE, FOCAL_LENGTH)
 
-    position_camera(camera_prim, card, subject_center, distance)
+    position_camera(camera_prim, card, center_of_card_face, distance)
 
     calculate_apertures(camera_prim, bounding_box, distance, card)
 
@@ -26,12 +26,12 @@ def create_camera_with_defaults(camera_stage, name):
 
     return camera_prim
 
-def position_camera(camera_prim, card, subject_center, distance):
-    camera_translation = create_camera_translation(card, subject_center, distance)
+def position_camera(camera_prim, card, center_of_card_face, distance):
+    camera_translation = create_camera_translation(card, center_of_card_face, distance)
     apply_camera_translation(camera_prim, camera_translation)
 
-def create_camera_translation(card, subject_center, distance):
-    return subject_center + create_translate_vector(distance * card.sign, card.translationIndex)
+def create_camera_translation(card, center_of_card_face, distance):
+    return center_of_card_face + create_translate_vector(distance * card.sign, card.translationIndex)
 
 def calculate_apertures(camera_prim, bounding_box, distance, card):
     flip_aperatures = False
