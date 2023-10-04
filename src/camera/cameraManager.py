@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from pxr import Usd, UsdGeom, UsdLux
+from pxr import Usd, UsdGeom, UsdLux, Gf
 from collections import namedtuple
 from camera.cameraGenerator import create_camera_for_card
 
@@ -32,8 +32,12 @@ def create_cameras(camera_stage, subject_stage, cards):
         card_width = (max_bound[card.horizontalIndex] - min_bound[card.horizontalIndex]) * 10
         card_height = (max_bound[card.verticalIndex] - min_bound[card.verticalIndex]) * 10
         card_bounding_box = BoundingBox(card_width, card_height)
+        
+        faceTranslationValue = max_bound[card.translationIndex] if card.sign > 0 else min_bound[card.translationIndex]
+        center_of_card_face = Gf.Vec3d(subject_center[0], subject_center[1], subject_center[2])
+        center_of_card_face[card.translationIndex] = faceTranslationValue
 
-        create_camera_for_card(card, camera_stage, subject_center, card_bounding_box)
+        create_camera_for_card(card, camera_stage, center_of_card_face, card_bounding_box)
 
 def get_bounding_box(subject_stage):
     bboxCache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
