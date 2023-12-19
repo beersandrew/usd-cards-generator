@@ -3,7 +3,7 @@
 import argparse
 from collections import namedtuple
 
-Args = namedtuple('Args', ['usd_file', 'create_usdz_result', 'verbose', 'is_usdz', 'usdz_wrapper_name', 'file_to_sublayer', 'output_extension', 'dome_light'])
+Args = namedtuple('Args', ['usd_file', 'create_usdz_result', 'verbose', 'is_usdz', 'usdz_wrapper_name', 'file_to_sublayer', 'output_extension', 'dome_light', 'apply_cards'])
 
 def parse_args():
     parser = argparse.ArgumentParser(description="This script generates cards for a given USD file and associates them with the file.")
@@ -23,6 +23,9 @@ def parse_args():
     parser.add_argument('--verbose', 
                         action='store_true',
                         help='Prints out the steps as they happen')
+    parser.add_argument('--apply-cards', 
+                        action='store_true',
+                        help='Saves the images as the cards for the given USD file.')
     
     args = parser.parse_args()
 
@@ -37,5 +40,6 @@ def parse_args():
                 usdz_wrapper_name, 
                 file_to_sublayer,
                 args.output_extension,
-                args.dome_light)
+                args.dome_light,
+                args.apply_cards)
 

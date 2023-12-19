@@ -20,9 +20,12 @@ cards = [
     Card('ZNeg', 0, 1, -1, [Rotation(2, 180), Rotation(1, 180)], 2)
 ]
 
-def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose):
+def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose, apply_cards):
 
-    apply_cards_defaults(subject_stage, verbose)
+    if apply_cards:
+        if verbose: 
+            print("Step 1: Applying cards default values...")
+        apply_cards_defaults(subject_stage, verbose)
 
     if verbose: 
         print("Step 2: Setting up the cameras...")
@@ -31,14 +34,12 @@ def generate_card_images(usd_file, subject_stage, dome_light, output_extension, 
     
     if verbose:
         print("Step 3: Taking the snapshots...")
+
     image_names = take_snapshots(cards, output_extension)
 
     return image_names
 
 def apply_cards_defaults(subject_stage, verbose):
-    if verbose: 
-        print("Step 1: Applying cards default values...")
-    
     subject_root_prim = subject_stage.GetDefaultPrim()
     subject_root_prim.SetMetadata("kind", "component")
     UsdGeom.ModelAPI.Apply(subject_root_prim)
@@ -85,11 +86,12 @@ if __name__ == "__main__":
 
     subject_stage = create_usdz_wrapper_stage(args.usd_file, args.usdz_wrapper_name) if args.is_usdz else Usd.Stage.Open(args.usd_file)
 
-    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose)
+    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose, args.apply_cards)
 
-    if args.verbose:
-        print("Step 4: Linking cards to subject...")
-    link_images_to_subject(subject_stage, images)
+    if args.apply_cards:
+        if args.verbose:
+            print("Step 4: Linking cards to subject...")
+        link_images_to_subject(subject_stage, images)
 
     subject_stage.GetRootLayer().Save()
 
