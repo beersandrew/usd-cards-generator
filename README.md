@@ -17,6 +17,7 @@ optional arguments:
   - `--verbose` :             Prints out the steps as they happen
   - `--dome-light` :          The path to the dome light HDR image to use, if any
   - `--apply-cards` :         Saves the images as the cards for the given USD file.
+  - `--render-purposes` :     A comma separated list of render purposes to include in the thumbnail. Valid values are: default, render, proxy, guide.
 
   Note: You must have usd installed and available in your path. [Install Steps Here](https://github.com/PixarAnimationStudios/OpenUSD#getting-and-building-the-code)
 

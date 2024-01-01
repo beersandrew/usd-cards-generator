@@ -20,7 +20,7 @@ cards = [
     Card('ZNeg', 0, 1, -1, [Rotation(2, 180), Rotation(1, 180)], 2)
 ]
 
-def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose, apply_cards):
+def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose, apply_cards, render_purposes):
 
     if apply_cards:
         if verbose: 
@@ -30,7 +30,7 @@ def generate_card_images(usd_file, subject_stage, dome_light, output_extension, 
     if verbose: 
         print("Step 2: Setting up the cameras...")
 
-    setup_cameras(subject_stage, usd_file, cards, dome_light)
+    setup_cameras(subject_stage, usd_file, cards, dome_light, render_purposes)
     
     if verbose:
         print("Step 3: Taking the snapshots...")
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     subject_stage = create_usdz_wrapper_stage(args.usd_file, args.usdz_wrapper_name) if args.is_usdz else Usd.Stage.Open(args.usd_file)
 
-    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose, args.apply_cards)
+    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose, args.apply_cards, args.render_purposes)
 
     if args.apply_cards:
         if args.verbose:
