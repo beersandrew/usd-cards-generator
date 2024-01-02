@@ -6,15 +6,16 @@ import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
+CARDS_FOLDER_NAME = "cards"
+
 def take_snapshots(cards, output_extension):
-    Path("renders").mkdir(parents=True, exist_ok=True)
     images = []
     renderer = get_renderer()
 
     def task(card):
-        image_name = os.path.join("renders", card.name + "." + output_extension).replace("\\", "/")
+        image_name = create_image_filename(card.name, output_extension, card.parentPath)
         cmd = ['usdrecord','--camera', card.name, '--imageWidth', '2048', '--renderer', renderer, 'cameras.usda', image_name]
-        run_os_specific_usdrecord(cmd)
+        run_os_specific_command(cmd)
         return image_name
     
     with ThreadPoolExecutor() as executor:
@@ -22,6 +23,15 @@ def take_snapshots(cards, output_extension):
     
     os.remove("cameras.usda")
     return images
+
+def create_image_filename(card_name, extension, parent_path):
+
+    if CARDS_FOLDER_NAME:
+        cards_folder_dir = Path().joinpath(parent_path, CARDS_FOLDER_NAME)
+    else:
+        cards_folder_dir = parent_path
+    cards_folder_dir.mkdir(parents=True, exist_ok=True)
+    return str(Path().joinpath(cards_folder_dir, card_name).with_suffix("." + extension)).replace("\\", "/")
 
 def get_renderer():
     if os.name == 'nt':
@@ -35,7 +45,7 @@ def get_renderer():
             print("linux default renderer GL being used...")
             return 'GL'
 
-def run_os_specific_usdrecord(cmd):
+def run_os_specific_command(cmd):
     if os.name == 'nt':
         subprocess.run(cmd, check=True, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     else:
