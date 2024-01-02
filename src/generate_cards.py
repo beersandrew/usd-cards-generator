@@ -101,9 +101,8 @@ if __name__ == "__main__":
     if args.apply_cards:
         if args.verbose:
             print("Step 4: Linking cards to subject...")
-        link_images_to_subject(subject_stage, images)
-
-    subject_stage.GetRootLayer().Save()
+        stripped_image_paths = [image.replace(str(Path(args.usd_file).parent), "").lstrip('/') for image in images]
+        link_images_to_subject(subject_stage, stripped_image_paths)
 
     if args.create_usdz_result:
         if args.verbose:
