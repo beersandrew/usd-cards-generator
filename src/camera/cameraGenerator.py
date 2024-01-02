@@ -4,10 +4,15 @@ from pxr import UsdGeom, Gf
 from camera.utils.distanceCalculator import get_distance_to_frame_subject
 from camera.globals import APERTURE, FOCAL_LENGTH, FOCUS_DISTANCE
 
-def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box):
-    camera_prim = create_camera_with_defaults(camera_stage, card.name)
+def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box, camera_view_axis_distance):
+    camera_prim = create_camera_with_defaults(camera_stage, card.name, card.translationIndex)
 
     distance = get_distance_to_frame_subject(bounding_box, APERTURE, FOCAL_LENGTH)
+
+    nearClip = distance / 10.0
+    farClip = (( distance + camera_view_axis_distance ) / 10.0) * 2
+    clippingPlanes = Gf.Vec2f(nearClip, farClip)
+    camera_prim.GetClippingRangeAttr().Set(clippingPlanes)
 
     position_camera(camera_prim, card, center_of_card_face, distance)
 
@@ -15,7 +20,7 @@ def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box
 
     rotate_camera(card, camera_prim)
 
-def create_camera_with_defaults(camera_stage, name):
+def create_camera_with_defaults(camera_stage, name, translationIndex):
     camera_prim = UsdGeom.Camera.Define(camera_stage, '/CardGenerator/' + name)
     camera_prim.CreateFocalLengthAttr(FOCAL_LENGTH)
     camera_prim.CreateFocusDistanceAttr(FOCUS_DISTANCE)

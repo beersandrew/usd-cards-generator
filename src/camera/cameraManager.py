@@ -44,7 +44,9 @@ def create_cameras(camera_stage, subject_stage, cards, render_purposes):
         center_of_card_face = Gf.Vec3d(subject_center[0], subject_center[1], subject_center[2])
         center_of_card_face[card.translationIndex] = faceTranslationValue
 
-        create_camera_for_card(card, camera_stage, center_of_card_face, card_bounding_box)
+        camera_view_axis_distance = card_height = (max_bound[card.translationIndex] - min_bound[card.translationIndex])
+
+        create_camera_for_card(card, camera_stage, center_of_card_face, card_bounding_box, camera_view_axis_distance)
 
 def convert_render_purposes_to_tokens(render_purposes):
     return [RENDER_PURPOSE_MAP[key] for key in render_purposes.split(',')]
