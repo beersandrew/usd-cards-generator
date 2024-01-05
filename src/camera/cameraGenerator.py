@@ -5,7 +5,7 @@ from camera.utils.distanceCalculator import get_distance_to_frame_subject
 from camera.globals import APERTURE, FOCAL_LENGTH, FOCUS_DISTANCE
 
 def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box, camera_view_axis_distance):
-    camera_prim = create_camera_with_defaults(camera_stage, card.name, card.translationIndex)
+    camera_prim = create_camera_with_defaults(camera_stage, card.name)
 
     distance = get_distance_to_frame_subject(bounding_box, APERTURE, FOCAL_LENGTH)
 
@@ -20,7 +20,7 @@ def create_camera_for_card(card, camera_stage, center_of_card_face, bounding_box
 
     rotate_camera(card, camera_prim)
 
-def create_camera_with_defaults(camera_stage, name, translationIndex):
+def create_camera_with_defaults(camera_stage, name):
     camera_prim = UsdGeom.Camera.Define(camera_stage, '/CardGenerator/' + name)
     camera_prim.CreateFocalLengthAttr(FOCAL_LENGTH)
     camera_prim.CreateFocusDistanceAttr(FOCUS_DISTANCE)

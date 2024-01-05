@@ -3,7 +3,7 @@
 import argparse
 from collections import namedtuple
 
-Args = namedtuple('Args', ['usd_file', 'create_usdz_result', 'verbose', 'is_usdz', 'usdz_wrapper_name', 'file_to_sublayer', 'output_extension', 'dome_light', 'apply_cards', 'render_purposes'])
+Args = namedtuple('Args', ['usd_file', 'create_usdz_result', 'verbose', 'is_usdz', 'usdz_wrapper_name', 'file_to_sublayer', 'output_extension', 'dome_light', 'apply_cards', 'render_purposes', 'image_width'])
 
 def parse_args():
     parser = argparse.ArgumentParser(description="This script generates cards for a given USD file and associates them with the file.")
@@ -30,6 +30,10 @@ def parse_args():
                         type=str,
                         help='A comma separated list of render purposes to include in the thumbnail. Valid values are: default, render, proxy, guide.',
                         default='default')
+    parser.add_argument('--image-width',
+                        type=int,
+                        help='The width of the image to generate. Default is 2048.',
+                        default=2048)
     
     args = parser.parse_args()
 
@@ -46,5 +50,6 @@ def parse_args():
                 args.output_extension,
                 args.dome_light,
                 args.apply_cards,
-                args.render_purposes)
+                args.render_purposes,
+                args.image_width)
 

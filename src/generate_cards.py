@@ -23,7 +23,7 @@ cards = [
 CARDS_LAYER_SUFFIX_USDA = "_Cards.usda"
 CARDS_LAYER_SUFFIX = "_Cards"
 
-def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose, apply_cards, render_purposes):
+def generate_card_images(usd_file, subject_stage, dome_light, output_extension, verbose, apply_cards, render_purposes, image_width):
 
     if apply_cards:
         if verbose: 
@@ -43,7 +43,7 @@ def generate_card_images(usd_file, subject_stage, dome_light, output_extension, 
     for i, card in enumerate(cards):
         cards[i] = card._replace(parentPath=usd_file_path.parent)
 
-    image_names = take_snapshots(cards, output_extension)
+    image_names = take_snapshots(cards, output_extension, image_width)
 
     return image_names
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     subject_stage = create_usdz_wrapper_stage(args.usd_file, args.usdz_wrapper_name) if args.is_usdz else Usd.Stage.Open(args.usd_file)
 
-    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose, args.apply_cards, args.render_purposes)
+    images = generate_card_images(args.file_to_sublayer, subject_stage, args.dome_light, args.output_extension, args.verbose, args.apply_cards, args.render_purposes, args.image_width)
 
     if args.apply_cards:
         if args.verbose:
