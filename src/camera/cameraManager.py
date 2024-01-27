@@ -5,10 +5,16 @@ from collections import namedtuple
 from camera.cameraGenerator import create_camera_for_card
 
 BoundingBox = namedtuple('BoundingBox', ['width', 'height'])
+RENDER_PURPOSE_MAP = {
+    "default": UsdGeom.Tokens.default_,
+    "render": UsdGeom.Tokens.render,
+    "proxy": UsdGeom.Tokens.proxy,
+    "guide": UsdGeom.Tokens.guide
+}
 
-def setup_cameras(subject_stage, usd_file, cards, dome_light):
+def setup_cameras(subject_stage, usd_file, cards, dome_light, render_purposes):
     camera_stage = create_camera_stage()
-    create_cameras(camera_stage, subject_stage, cards)
+    create_cameras(camera_stage, subject_stage, cards, render_purposes)
     sublayer_subject(camera_stage, usd_file)
 
     if dome_light:
@@ -22,8 +28,9 @@ def create_camera_stage():
 
     return stage
 
-def create_cameras(camera_stage, subject_stage, cards):
-    stage_bounding_box = get_bounding_box(subject_stage)
+def create_cameras(camera_stage, subject_stage, cards, render_purposes):
+    render_purpose_tokens = convert_render_purposes_to_tokens(render_purposes)
+    stage_bounding_box = get_bounding_box(subject_stage, render_purpose_tokens)
     min_bound = stage_bounding_box.GetMin()
     max_bound = stage_bounding_box.GetMax()
     subject_center = (min_bound + max_bound) / 2.0
@@ -37,11 +44,15 @@ def create_cameras(camera_stage, subject_stage, cards):
         center_of_card_face = Gf.Vec3d(subject_center[0], subject_center[1], subject_center[2])
         center_of_card_face[card.translationIndex] = faceTranslationValue
 
-        create_camera_for_card(card, camera_stage, center_of_card_face, card_bounding_box)
+        camera_view_axis_distance = card_height = (max_bound[card.translationIndex] - min_bound[card.translationIndex])
 
-def get_bounding_box(subject_stage):
-    bboxCache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
-    # Compute the bounding box for all geometry under the root
+        create_camera_for_card(card, camera_stage, center_of_card_face, card_bounding_box, camera_view_axis_distance)
+
+def convert_render_purposes_to_tokens(render_purposes):
+    return [RENDER_PURPOSE_MAP[key] for key in render_purposes.split(',')]
+
+def get_bounding_box(subject_stage, render_purpose_tokens):
+    bboxCache = UsdGeom.BBoxCache(Usd.TimeCode(0.0), render_purpose_tokens)
     root = subject_stage.GetPseudoRoot()
     return bboxCache.ComputeWorldBound(root).GetBox()
 
